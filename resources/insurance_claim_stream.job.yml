@@ -1,0 +1,46 @@
+resources:
+  jobs:
+    insurance_claim_stream:
+      name: ${bundle.name}-${bundle.target}
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: setup
+          existing_cluster_id: ${var.cluster_id}
+          notebook_task:
+            notebook_path: ../notebooks/00_setup.py
+            base_parameters: &pipeline_parameters
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              landing_schema: ${var.landing_schema}
+              volume: ${var.volume}
+              checkpoint_root: ${var.checkpoint_root}
+        - task_key: generate_events
+          depends_on: [{task_key: setup}]
+          existing_cluster_id: ${var.cluster_id}
+          notebook_task:
+            notebook_path: ../notebooks/01_generate_events.py
+            base_parameters: *pipeline_parameters
+        - task_key: bronze_ingestion
+          depends_on: [{task_key: generate_events}]
+          existing_cluster_id: ${var.cluster_id}
+          notebook_task:
+            notebook_path: ../notebooks/02_bronze_ingestion.py
+            base_parameters: *pipeline_parameters
+        - task_key: silver_processing
+          depends_on: [{task_key: bronze_ingestion}]
+          existing_cluster_id: ${var.cluster_id}
+          notebook_task:
+            notebook_path: ../notebooks/03_silver_processing.py
+            base_parameters: *pipeline_parameters
+        - task_key: latest_claim_state
+          depends_on: [{task_key: silver_processing}]
+          existing_cluster_id: ${var.cluster_id}
+          notebook_task:
+            notebook_path: ../notebooks/04_latest_claim_state.py
+            base_parameters: *pipeline_parameters
+        - task_key: monitoring
+          depends_on: [{task_key: latest_claim_state}]
+          existing_cluster_id: ${var.cluster_id}
+          notebook_task:
+            notebook_path: ../notebooks/05_monitoring_and_demo.py
+            base_parameters: *pipeline_parameters
